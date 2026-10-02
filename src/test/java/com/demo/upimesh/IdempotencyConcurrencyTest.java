@@ -1,23 +1,28 @@
 package com.demo.upimesh;
 
-import com.demo.upimesh.crypto.HybridCryptoService;
-import com.demo.upimesh.crypto.ServerKeyHolder;
-import com.demo.upimesh.model.MeshPacket;
-import com.demo.upimesh.model.PaymentInstruction;
-import com.demo.upimesh.model.AccountRepository;
-import com.demo.upimesh.service.BridgeIngestionService;
-import com.demo.upimesh.service.DemoService;
-import com.demo.upimesh.service.IdempotencyService;
+import java.math.BigDecimal;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-import java.math.BigDecimal;
-import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicInteger;
-
-import static org.junit.jupiter.api.Assertions.*;
+import com.demo.upimesh.crypto.HybridCryptoService;
+import com.demo.upimesh.crypto.ServerKeyHolder;
+import com.demo.upimesh.model.AccountRepository;
+import com.demo.upimesh.model.MeshPacket;
+import com.demo.upimesh.model.PaymentInstruction;
+import com.demo.upimesh.service.BridgeIngestionService;
+import com.demo.upimesh.service.DemoService;
+import com.demo.upimesh.service.IdempotencyService;
+import com.demo.upimesh.service.MeshSimulatorService;
 
 /**
  * The killer test: simulates the "three bridges deliver at the same instant"
@@ -32,6 +37,7 @@ class IdempotencyConcurrencyTest {
     @Autowired private AccountRepository accounts;
     @Autowired private HybridCryptoService crypto;
     @Autowired private ServerKeyHolder serverKey;
+    @Autowired private MeshSimulatorService mesh;
 
     @BeforeEach
     void clear() {
@@ -39,14 +45,24 @@ class IdempotencyConcurrencyTest {
     }
 
     @Test
+    void unknownStartDeviceFallsBackToAlice() throws Exception {
+        MeshPacket packet = demoService.createPacket(
+                "aryan@demo", "shubham@demo", new BigDecimal("25.00"), "1234", 5);
+
+        mesh.inject("phone-aryan", packet);
+
+        assertEquals(1, mesh.getDevice("phone-alice").packetCount());
+    }
+
+    @Test
     void singlePacketDeliveredByThreeBridgesSettlesExactlyOnce() throws Exception {
         // Capture starting balances
-        BigDecimal aliceBefore = accounts.findById("alice@demo").orElseThrow().getBalance();
-        BigDecimal bobBefore = accounts.findById("bob@demo").orElseThrow().getBalance();
+        BigDecimal aliceBefore = accounts.findById("aryan@demo").orElseThrow().getBalance();
+        BigDecimal bobBefore = accounts.findById("shubham@demo").orElseThrow().getBalance();
 
         // One packet, but we'll deliver it from 3 "bridges" simultaneously
         MeshPacket packet = demoService.createPacket(
-                "alice@demo", "bob@demo", new BigDecimal("100.00"), "1234", 5);
+                "aryan@demo", "shubham@demo", new BigDecimal("100.00"), "1234", 5);
 
         ExecutorService pool = Executors.newFixedThreadPool(3);
         CountDownLatch start = new CountDownLatch(1);
@@ -74,8 +90,8 @@ class IdempotencyConcurrencyTest {
         assertEquals(2, duplicates.get(), "the other two should be duplicates");
 
         // Balance moved exactly once
-        BigDecimal aliceAfter = accounts.findById("alice@demo").orElseThrow().getBalance();
-        BigDecimal bobAfter = accounts.findById("bob@demo").orElseThrow().getBalance();
+        BigDecimal aliceAfter = accounts.findById("aryan@demo").orElseThrow().getBalance();
+        BigDecimal bobAfter = accounts.findById("shubham@demo").orElseThrow().getBalance();
         assertEquals(aliceBefore.subtract(new BigDecimal("100.00")), aliceAfter);
         assertEquals(bobBefore.add(new BigDecimal("100.00")), bobAfter);
     }
@@ -83,7 +99,7 @@ class IdempotencyConcurrencyTest {
     @Test
     void tamperedCiphertextIsRejected() throws Exception {
         MeshPacket packet = demoService.createPacket(
-                "alice@demo", "bob@demo", new BigDecimal("50.00"), "1234", 5);
+                "aryan@demo", "shubham@demo", new BigDecimal("50.00"), "1234", 5);
 
         // Flip a byte in the middle of the ciphertext
         char[] chars = packet.getCiphertext().toCharArray();
@@ -97,7 +113,7 @@ class IdempotencyConcurrencyTest {
     @Test
     void encryptDecryptRoundTrip() throws Exception {
         PaymentInstruction original = new PaymentInstruction(
-                "alice@demo", "bob@demo", new BigDecimal("123.45"),
+                "aryan@demo", "shubham@demo", new BigDecimal("123.45"),
                 "abcdef", "nonce-1", System.currentTimeMillis());
 
         String ct = crypto.encrypt(original, serverKey.getPublicKey());

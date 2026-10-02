@@ -40,15 +40,27 @@ You'll see all three in the dashboard.
 - **JDK 17 or newer** installed and on PATH (or `JAVA_HOME` set). Check with `java -version`.
 - That's it. No database, no Redis, no Maven (the wrapper handles it). Just Java.
 
+### Quick run in VS Code (recommended)
+
+From the project root in the integrated terminal, run:
+
+```powershell
+./run-demo.ps1
+```
+
+This script automatically points Maven to the installed Java toolchain and starts the app without needing to type the full Maven path each time.
+
 ### Run on Windows
 
 Open a terminal in the project folder and run:
 
 ```cmd
-mvnw.cmd spring-boot:run
+mvn spring-boot:run
 ```
 
-The first run downloads Maven (~10 MB) and all dependencies (~80 MB) — give it a couple of minutes. Subsequent runs start in a few seconds.
+If `mvn` is not recognized, install Maven and add it to PATH, or use the PowerShell helper script above.
+
+The first run downloads dependencies and starts the Spring Boot app. Subsequent runs start in a few seconds.
 
 ### Run on Mac/Linux
 

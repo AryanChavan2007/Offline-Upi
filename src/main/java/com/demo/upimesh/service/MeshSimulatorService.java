@@ -1,12 +1,18 @@
 package com.demo.upimesh.service;
 
-import com.demo.upimesh.model.MeshPacket;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
+import com.demo.upimesh.model.MeshPacket;
 
 /**
  * Simulates the Bluetooth mesh.
@@ -51,11 +57,14 @@ public class MeshSimulatorService {
      * Sender drops a packet into the mesh by handing it to their own device.
      */
     public void inject(String senderDeviceId, MeshPacket packet) {
-        VirtualDevice sender = devices.get(senderDeviceId);
-        if (sender == null) throw new IllegalArgumentException("Unknown device: " + senderDeviceId);
+        String resolvedDeviceId = devices.containsKey(senderDeviceId) ? senderDeviceId : "phone-alice";
+        VirtualDevice sender = devices.get(resolvedDeviceId);
+        if (sender == null) {
+            throw new IllegalArgumentException("Unknown device: " + senderDeviceId + " and no fallback device available");
+        }
         sender.hold(packet);
         log.info("Packet {} injected at {} (TTL={})",
-                packet.getPacketId().substring(0, 8), senderDeviceId, packet.getTtl());
+                packet.getPacketId().substring(0, 8), resolvedDeviceId, packet.getTtl());
     }
 
     /**

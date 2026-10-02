@@ -1,8 +1,12 @@
 package com.demo.upimesh.model;
 
-import jakarta.persistence.*;
-
 import java.math.BigDecimal;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 
 /**
  * Simulated bank account. In a real system this would live in the bank's core,
@@ -13,7 +17,7 @@ import java.math.BigDecimal;
 public class Account {
 
     @Id
-    private String vpa; // Virtual Payment Address, e.g. "alice@demo"
+    private String vpa; // Virtual Payment Address, e.g. "aryan@demo"
 
     @Column(nullable = false)
     private String holderName;
